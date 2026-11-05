@@ -1,0 +1,1863 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Siemens_ACM200_Diagnostic_Tool</title>
+    <!-- jQuery CDN -->
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <style>
+        :root {
+            --bg-color: #0f1417;
+            --card-bg: #182026;
+            --panel-bg: #2a343d;
+            --accent-blue: #00bcd4;
+            --text-main: #e0e6ed;
+            --border-color: #3e4c59;
+            --counter-bg: #090d10;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            margin: 0;
+            padding: 10px;
+            transition: opacity 0.3s ease;
+            overflow-x: hidden;
+            touch-action: manipulation;
+        }
+
+        body.reloading { opacity: 0.1; }
+
+        .container {
+            width: 100%;
+            max-width: 1150px;
+            margin: 0 auto;
+            padding: 0 5px;
+            position: relative;
+        }
+
+        header {
+            text-align: center;
+            padding-bottom: 10px;
+            border-bottom: 2px solid var(--border-color);
+            margin-bottom: 15px;
+        }
+
+        header h1 {
+            margin: 0;
+            color: var(--accent-blue);
+            font-size: 20px;
+        }
+
+        #global-tooltip {
+            position: absolute;
+            top: 52px;
+            left: 5px;
+            right: 5px;
+            background: linear-gradient(135deg, rgba(24, 37, 48, 0.98) 0%, rgba(13, 19, 24, 0.98) 100%);
+            color: #ffffff;
+            border: 2px solid #00e5ff;
+            padding: 10px 15px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-family: 'Segoe UI', Tahoma, monospace;
+            z-index: 99999;
+            box-shadow: 0 8px 30px rgba(0, 229, 255, 0.5), inset 0 1px 0 rgba(255,255,255,0.15);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        #particle-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 100000;
+            display: none;
+        }
+
+        .tooltip-led {
+            width: 15px;
+            height: 15px;
+            border-radius: 50%;
+            border: 2px solid #555;
+            flex-shrink: 0;
+            background-color: #dcdcdc;
+            display: inline-block;
+        }
+
+        .tooltip-text-content {
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            line-height: 1.4;
+        }
+
+        .main-layout {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 15px;
+        }
+
+        @media (min-width: 850px) {
+            .main-layout {
+                grid-template-columns: 380px 1fr;
+                gap: 20px;
+            }
+            body { padding: 20px; }
+            header h1 { font-size: 24px; }
+            #global-tooltip { top: 62px; }
+        }
+
+        .card {
+            background: var(--card-bg);
+            border-radius: 8px;
+            padding: 15px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4);
+            border: 1px solid var(--border-color);
+            width: 100%;
+            overflow: hidden;
+        }
+
+        .card-header-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            border-bottom: 1px solid #34444e;
+            padding-bottom: 10px;
+            margin-bottom: 10px;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+
+        .card h2 {
+            margin: 0;
+            font-size: 15px;
+            color: var(--accent-blue);
+            border: none;
+            padding: 0;
+        }
+
+        .controls-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            align-items: flex-end;
+        }
+
+        .toggles-row-top, .toggles-row-bottom {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .tooltip-toggle-wrapper {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 11px;
+            color: #a0aec0;
+            width: 135px;
+            justify-content: space-between;
+        }
+
+        .widget-box {
+            background: #111820;
+            border: 1px solid #00bcd4;
+            border-radius: 4px;
+            padding: 3px 6px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            box-shadow: inset 0 0 8px rgba(0, 188, 212, 0.2);
+            width: 135px;
+            height: 38px;
+        }
+
+        .widget-title {
+            font-size: 7.5px;
+            font-weight: bold;
+            color: #a0aec0;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            line-height: 1;
+            margin-bottom: 2px;
+        }
+
+        .widget-display-row {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 4px;
+            width: 100%;
+        }
+
+        .widget-display {
+            font-family: 'Courier New', Courier, monospace;
+            color: #00ff66;
+            font-size: 11px;
+            font-weight: bold;
+            letter-spacing: 0.5px;
+            text-shadow: 0 0 6px rgba(0, 255, 102, 0.4);
+            line-height: 1;
+        }
+
+        .timer-controls {
+            display: flex;
+            gap: 2px;
+        }
+
+        .timer-btn {
+            background: #1f2937;
+            border: 1px solid #4b5563;
+            color: #e5e7eb;
+            font-size: 6.5px;
+            font-weight: bold;
+            padding: 1px 3px;
+            border-radius: 2px;
+            cursor: pointer;
+            transition: all 0.15s;
+            line-height: 1;
+        }
+
+        .timer-btn:hover {
+            background: var(--accent-blue);
+            color: #000;
+            border-color: #00e5ff;
+        }
+
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 30px;
+            height: 16px;
+            flex-shrink: 0;
+        }
+
+        .switch input { 
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-color: #374151;
+            transition: .3s;
+            border-radius: 16px;
+            border: 1px solid #4b5563;
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 10px;
+            width: 10px;
+            left: 2px;
+            bottom: 2px;
+            background-color: white;
+            transition: .3s;
+            border-radius: 50%;
+        }
+
+        input:checked + .slider {
+            background-color: var(--accent-blue);
+            border-color: #00e5ff;
+        }
+
+        input:checked + .slider:before {
+            transform: translateX(14px);
+        }
+
+        .acm-front-panel {
+            background: var(--panel-bg);
+            border: 3px solid #1a2228;
+            border-radius: 6px;
+            padding: 12px;
+            width: 100%;
+            max-width: 350px;
+            margin: 0 auto;
+            box-shadow: inset 0 0 20px rgba(0,0,0,0.6), 0 5px 15px rgba(0,0,0,0.5);
+            position: relative;
+        }
+
+        .panel-brand-traditional {
+            color: #00a099;
+            text-align: center;
+            font-family: 'Arial Black', Arial, sans-serif;
+            font-weight: 900;
+            padding: 2px 0 10px 0;
+            font-size: 17px;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+        }
+
+        .panel-id-row {
+            display: flex;
+            justify-content: flex-start;
+            align-items: center;
+            margin-bottom: 8px;
+            padding: 2px 3px;
+            cursor: pointer;
+            border-radius: 3px;
+            transition: background 0.15s;
+        }
+        .panel-id-row:hover { background: rgba(0, 188, 212, 0.15); }
+
+        .panel-id-slot {
+            background: linear-gradient(145deg, #4b5563, #374151);
+            border: 1px solid #6b7280;
+            border-top: 1px solid #9ca3af;
+            height: 22px;
+            border-radius: 3px;
+            text-align: center;
+            font-size: 9px;
+            color: #f3f4f6;
+            font-weight: bold;
+            letter-spacing: 1px;
+            line-height: 20px;
+            width: 120px;
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.6), 0 2px 4px rgba(0,0,0,0.3);
+            text-shadow: 0 1px 2px rgba(0,0,0,0.8);
+        }
+
+        .panel-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 6px;
+            font-family: monospace;
+            font-size: 11px;
+            padding: 2px 3px;
+            border-radius: 3px;
+            position: relative;
+        }
+
+        .panel-row.clickable {
+            cursor: pointer;
+            transition: background 0.15s;
+        }
+
+        .panel-row.clickable:hover { background: rgba(0, 188, 212, 0.15); }
+        .panel-row.non-clickable { cursor: default; }
+
+        .full-clickable-btn-row {
+            cursor: pointer;
+            transition: all 0.2s ease;
+            user-select: none;
+        }
+        .full-clickable-btn-row:hover {
+            background: rgba(0, 188, 212, 0.25) !important;
+            border-color: #00e5ff !important;
+        }
+        .full-clickable-btn-row.active-press {
+            transform: scale(0.96);
+            background: rgba(255, 179, 0, 0.3) !important;
+            border-color: #ffb300 !important;
+        }
+
+        .num-tag {
+            color: #00e5ff;
+            font-weight: bold;
+            width: 22px;
+            text-align: right;
+            margin-right: 6px;
+            flex-shrink: 0;
+            z-index: 2;
+        }
+
+        .element-desc {
+            flex-grow: 1;
+            margin-left: 6px;
+            font-weight: bold;
+            z-index: 2;
+        }
+
+        .push-btn {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #444 0%, #1a1a1a 100%);
+            border: 2px solid #888;
+            box-shadow: inset 0 2px 4px rgba(255,255,255,0.2), 0 2px 4px rgba(0,0,0,0.5);
+            display: inline-block;
+            cursor: pointer;
+            transition: transform 0.1s, background 0.15s;
+            z-index: 2;
+        }
+
+        .push-btn:hover { border-color: var(--accent-blue); }
+        .push-btn.active-press { transform: scale(0.85); background: #00bcd4; border-color: #fff; }
+
+        .square-push-btn {
+            width: 20px;
+            height: 20px;
+            border-radius: 4px;
+            background: linear-gradient(135deg, #00bcd4 0%, #007788 100%);
+            border: 2px solid #00e5ff;
+            box-shadow: inset 0 2px 4px rgba(255,255,255,0.4), 0 0 8px rgba(0, 229, 255, 0.6);
+            display: inline-block;
+            transition: transform 0.1s, background 0.15s, box-shadow 0.2s;
+            z-index: 2;
+            flex-shrink: 0;
+        }
+
+        .hold-progress {
+            position: absolute;
+            left: 0; top: 0; bottom: 0; width: 0%;
+            background: rgba(0, 229, 255, 0.35);
+            transition: width 0.05s linear;
+            z-index: 1;
+            border-radius: 4px;
+        }
+
+        .timer-popup {
+            position: absolute;
+            right: 10px; top: 50%;
+            transform: translateY(-50%);
+            background: #00bcd4;
+            color: #000;
+            font-size: 10px;
+            font-weight: bold;
+            padding: 2px 6px;
+            border-radius: 4px;
+            box-shadow: 0 0 8px rgba(0,188,212,0.8);
+            display: none;
+            z-index: 10;
+        }
+
+        .led-elem {
+            width: 13px;
+            height: 13px;
+            border-radius: 50%;
+            background-color: #dcdcdc;
+            border: 2px solid #555;
+            display: inline-block;
+            transition: all 0.2s;
+            z-index: 2;
+        }
+
+        .led-elem.green.solid, .tooltip-led.green.solid { background-color: #00ff66; box-shadow: 0 0 8px #00ff66; border-color: #fff; }
+        .led-elem.green.flash, .tooltip-led.green.flash, .led-elem.green.flashing { background-color: #00ff66; box-shadow: 0 0 10px #00ff66; border-color: #fff; animation: blink 0.6s infinite; }
+        
+        .led-elem.yellow.solid, .tooltip-led.yellow.solid { background-color: #ffb300; box-shadow: 0 0 10px #ffb300; border-color: #fff; }
+        .led-elem.yellow.flash, .tooltip-led.yellow.flash, .led-elem.yellow.flashing { background-color: #ffb300; box-shadow: 0 0 12px #ffb300; border-color: #fff; animation: blink 0.6s infinite; }
+        
+        .led-elem.orange.solid, .tooltip-led.orange.solid { background-color: #ff7700; box-shadow: 0 0 10px #ff7700; border-color: #fff; }
+
+        .led-elem.red.solid, .tooltip-led.red.solid { background-color: #ff3333; box-shadow: 0 0 8px #ff3333; border-color: #fff; }
+        .led-elem.red.flash, .tooltip-led.red.flash, .led-elem.red.flashing, .led-elem.flash { background-color: #ff3333; box-shadow: 0 0 12px #ff3333; border-color: #fff; animation: blink 0.6s infinite; }
+
+        @keyframes blink {
+            0% { opacity: 1; }
+            50% { opacity: 0.15; }
+            100% { opacity: 1; }
+        }
+
+        .sim-socket-group { display: flex; flex-direction: column; gap: 2px; margin-left: 6px; z-index: 2; }
+        .sim-pair { display: flex; gap: 2px; }
+
+        .sim-socket {
+            width: 7px;
+            height: 7px;
+            background: #111;
+            border-radius: 50%;
+            border: 1px solid #666;
+            box-shadow: inset 0 1px 2px rgba(0,0,0,0.8);
+        }
+
+        .fuse-row { cursor: pointer; transition: background 0.15s; }
+        .fuse-row:hover { background: rgba(255, 51, 51, 0.15); }
+
+        .fuse-slot {
+            width: 16px; height: 16px;
+            border-radius: 50%;
+            border: 2px solid #888;
+            background: #111;
+            text-align: center;
+            font-size: 7px;
+            line-height: 12px;
+            color: #ccc;
+            transition: all 0.2s;
+            z-index: 2;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .fuse-row.blown .fuse-slot {
+            border-color: #ff3333;
+            background: #ff3333;
+            color: #fff;
+            box-shadow: 0 0 6px #ff3333;
+        }
+
+        .fuse-desc { transition: color 0.2s; }
+        .fuse-row.blown .fuse-desc { color: #ff3333; font-weight: bold; }
+
+        .rj45-row-aligned {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 6px;
+            font-family: monospace;
+            font-size: 11px;
+            padding: 2px 3px;
+            border-radius: 3px;
+            position: relative;
+            cursor: pointer;
+            transition: background 0.15s;
+        }
+        .rj45-row-aligned:hover { background: rgba(0, 188, 212, 0.15); }
+
+        .rj45-inline-group {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            flex-grow: 1;
+            margin-left: 6px;
+        }
+
+        .rj45-icon-box {
+            width: 22px;
+            height: 16px;
+            background: #ffffff;
+            border: 2px solid #888888;
+            border-radius: 3px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 0 6px rgba(255,255,255,0.6);
+            transition: all 0.25s ease;
+            color: #000;
+        }
+
+        .rj45-icon-box.green-state {
+            background: #00ff66;
+            border-color: #ffffff;
+            box-shadow: 0 0 8px #00ff66;
+            color: #000;
+        }
+
+        .rj45-icon-box.black-state {
+            background: #111111;
+            border-color: #555555;
+            box-shadow: inset 0 1px 3px rgba(0,0,0,0.9);
+            color: #fff;
+        }
+
+        .rj45-status-label {
+            font-size: 11px;
+            font-weight: bold;
+            color: #ffffff;
+            transition: color 0.2s;
+        }
+
+        .rj45-status-label.green-text { color: #00ff66; }
+        .rj45-status-label.red-text { color: #ff3333; }
+
+        .panel-split { display: flex; justify-content: space-between; }
+        .left-side { display: flex; flex-direction: column; flex-grow: 1; }
+        .right-side { display: flex; flex-direction: column; width: 130px; flex-shrink: 0; }
+
+        .info-box {
+            background: #12181b;
+            border-left: 4px solid var(--accent-blue);
+            padding: 15px;
+            border-radius: 6px;
+            margin-top: 12px;
+            font-size: 13px;
+            line-height: 1.5;
+            min-height: 220px;
+            word-break: break-word;
+            box-shadow: inset 0 2px 5px rgba(0,0,0,0.5), 0 4px 15px rgba(0, 188, 212, 0.1);
+            border: 1px solid rgba(0, 188, 212, 0.2);
+        }
+
+        .info-box h3 { margin-top: 0; color: #00e5ff; font-size: 15px; }
+
+        .badge {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 3px;
+            font-size: 10px;
+            font-weight: bold;
+            margin-bottom: 8px;
+        }
+
+        .badge-info { background: #0288d1; color: #fff; }
+        .badge-fault { background: #c62828; color: #fff; }
+        .badge-warning { background: #f57c00; color: #fff; }
+
+        .btn-reset {
+            width: 100%;
+            margin-top: 12px;
+            padding: 10px;
+            background: #c62828;
+            color: #fff;
+            border: none;
+            border-radius: 5px;
+            font-weight: bold;
+            cursor: pointer;
+            font-size: 13px;
+            transition: background 0.2s;
+        }
+
+        .btn-reset:hover { background: #e53935; }
+
+        .counter-section {
+            margin-top: 12px;
+            background: var(--counter-bg);
+            border: 2px solid #00e5ff;
+            border-radius: 6px;
+            padding: 10px;
+            box-shadow: inset 0 0 10px rgba(0,229,255,0.2), 0 4px 12px rgba(0,0,0,0.6);
+            display: none;
+        }
+
+        .counter-section-title {
+            color: #00e5ff;
+            font-size: 11px;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            text-align: center;
+            margin-bottom: 8px;
+            border-bottom: 1px solid #1c2b36;
+            padding-bottom: 4px;
+        }
+
+        .counter-row-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+
+        .counter-card {
+            background: #111820;
+            border: 1px solid #283845;
+            border-radius: 4px;
+            padding: 6px 8px;
+            text-align: center;
+        }
+
+        .counter-card-header {
+            font-size: 10px;
+            font-weight: bold;
+            color: #a0aec0;
+            margin-bottom: 4px;
+        }
+
+        .digit-display {
+            font-family: 'Courier New', Courier, monospace;
+            background: #000000;
+            color: #00ff66;
+            font-size: 16px;
+            font-weight: bold;
+            padding: 4px 6px;
+            border-radius: 3px;
+            border: 1px solid #00aa44;
+            letter-spacing: 2px;
+            box-shadow: inset 0 0 8px rgba(0,255,102,0.3);
+            display: inline-block;
+            min-width: 80px;
+        }
+
+        .digit-display.occupied {
+            color: #ffb300;
+            border-color: #d4ac0d;
+            box-shadow: inset 0 0 8px rgba(255,179,0,0.3);
+        }
+
+        .digit-display.orange {
+            color: #ff7700;
+            border-color: #cc5500;
+            box-shadow: inset 0 0 8px rgba(255,119,0,0.3);
+        }
+
+        .digit-display.error {
+            color: #ff3333;
+            border-color: #c62828;
+            box-shadow: inset 0 0 8px rgba(255,51,51,0.3);
+        }
+
+        .counter-subtext {
+            font-size: 8px;
+            color: #718096;
+            margin-top: 3px;
+            font-family: monospace;
+        }
+
+        .app-footer {
+            margin-top: 20px;
+            text-align: center;
+            padding: 12px 15px;
+            background: linear-gradient(135deg, rgba(24, 32, 38, 0.7) 0%, rgba(15, 20, 23, 0.85) 100%);
+            border-top: 1px solid rgba(0, 188, 212, 0.15);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+            border-radius: 6px;
+            font-size: 11px;
+            color: rgba(224, 230, 237, 0.65);
+            font-family: 'Segoe UI', Tahoma, monospace;
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 4px 15px rgba(0, 0, 0, 0.3);
+            letter-spacing: 0.5px;
+            line-height: 1.5;
+        }
+    </style>
+</head>
+<body oncontextmenu="return false;">
+
+<div class="container">
+    <header>
+        <h1>SIEMENS ACM 200 Diagnostic Tool</h1>
+    </header>
+
+    <div id="global-tooltip" style="display: none;">
+        <canvas id="particle-canvas"></canvas>
+        <div id="tooltipLed" class="tooltip-led"></div>
+        <div class="tooltip-text-content" id="tooltipText"></div>
+    </div>
+
+    <div class="main-layout">
+        
+        <div class="card">
+            <h2>ACM Module</h2>
+            <div class="acm-front-panel">
+                <div class="panel-brand-traditional">SIEMENS</div>
+                
+                <div class="panel-id-row tooltip-trigger" data-tag="ID" data-msg="Configuration data of the ACM200">
+                    <span class="num-tag">A</span>
+                    <div class="panel-id-slot">ID PLUG</div>
+                </div>
+
+                <div class="panel-row clickable-btn-row tooltip-trigger" data-action="RST" id="row_rst" style="position:relative;">
+                    <div class="hold-progress" id="prog_rst"></div>
+                    <span class="num-tag">B</span>
+                    <div class="push-btn" id="btn_rst" title="Rst Button"></div>
+                    <span class="element-desc">RST</span>
+                    <div class="timer-popup" id="popup_rst">2.0s</div>
+                </div>
+
+                <div class="panel-split">
+                    <div class="left-side">
+                        <div class="panel-row clickable tooltip-trigger" data-key="OK" data-item="1"><span class="num-tag">1</span><div class="led-elem" id="LED_1"></div><span class="element-desc">OK</span></div>
+                        <div class="panel-row non-clickable tooltip-trigger" data-key="TVDS1" data-item="2" id="row_tvds1"><span class="num-tag">2</span><div class="led-elem" id="LED_2"></div><span class="element-desc">TVDS1</span></div>
+                        <div class="panel-row non-clickable tooltip-trigger" data-key="TVDS2" data-item="3" id="row_tvds2"><span class="num-tag">3</span><div class="led-elem" id="LED_3"></div><span class="element-desc">TVDS2</span></div>
+                        
+                        <div class="panel-row clickable tooltip-trigger" data-key="DS1_1" data-item="4"><span class="num-tag">4</span><div class="led-elem" id="LED_4"></div><span class="element-desc">DS1.1</span></div>
+                        <div class="panel-row clickable tooltip-trigger" data-key="DS1_1" data-item="5"><span class="num-tag">5</span><div class="led-elem" id="LED_5"></div><span class="element-desc">DS1.2</span></div>
+                        <div class="panel-row clickable tooltip-trigger" data-key="DS1_1" data-item="6"><span class="num-tag">6</span><div class="led-elem" id="LED_6"></div><span class="element-desc">DS2.1</span></div>
+                        <div class="panel-row clickable tooltip-trigger" data-key="DS1_1" data-item="7"><span class="num-tag">7</span><div class="led-elem" id="LED_7"></div><span class="element-desc">DS2.2</span></div>
+                        <div class="panel-row clickable tooltip-trigger" data-key="RR1" data-item="8"><span class="num-tag">8</span><div class="led-elem" id="LED_8"></div><span class="element-desc">RR1</span></div>
+                        <div class="panel-row clickable tooltip-trigger" data-key="RR1" data-item="9"><span class="num-tag">9</span><div class="led-elem" id="LED_9"></div><span class="element-desc">RR2</span></div>
+                        
+                        <div class="panel-row non-clickable tooltip-trigger" data-key="COM" data-item="10"><span class="num-tag">10</span><div class="led-elem" id="LED_10"></div><span class="element-desc">COM</span></div>
+                        
+                        <div class="panel-row clickable-btn-row tooltip-trigger" data-action="RST_RR1" id="row_rstrr1" style="margin-top:4px; position:relative;">
+                            <div class="hold-progress" id="prog_rstrr1"></div>
+                            <span class="num-tag">11</span><div class="push-btn" id="btn_rstrr1" title="Hold 4s to Reset RR1"></div><span class="element-desc">RST-RR1</span>
+                            <div class="timer-popup" id="popup_rstrr1">4.0s</div>
+                        </div>
+                        <div class="panel-row clickable-btn-row tooltip-trigger" data-action="RST_RR2" id="row_rstrr2" style="position:relative;">
+                            <div class="hold-progress" id="prog_rstrr2"></div>
+                            <span class="num-tag">12</span><div class="push-btn" id="btn_rstrr2" title="Hold 4s to Reset RR2"></div><span class="element-desc">RST-RR2</span>
+                            <div class="timer-popup" id="popup_rstrr2">4.0s</div>
+                        </div>
+
+                        <div class="rj45-row-aligned tooltip-trigger" data-tag="ETH" data-msg="Click to Cycle RJ45 Port State" onclick="_0x92a1b()" style="margin-top: 4px;">
+                            <span class="num-tag">19</span>
+                            <div class="rj45-inline-group">
+                                <div class="rj45-icon-box" id="rj45Box">
+                                    <svg width="12" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                                        <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"></path>
+                                        <path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"></path>
+                                        <path d="M4 22h16v-10H4z"></path>
+                                    </svg>
+                                </div>
+                                <span class="rj45-status-label" id="rj45Label">ETH PORT</span>
+                            </div>
+                        </div>
+
+                    </div>
+
+                    <div class="right-side">
+                        <div class="panel-row clickable tooltip-trigger" data-key="CAL" data-item="13" id="row_cal" style="align-items: center; position: relative;">
+                            <span class="num-tag">13</span>
+                            <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px; flex-grow:1;">
+                                <div class="led-elem" id="LED_13"></div>
+                                <div class="push-btn" id="btn_cal" title="Hold 3s for Calibration"></div>
+                            </div>
+                            <span class="element-desc" style="flex-grow:0; width: 38px;">CAL</span>
+                            <div class="hold-progress" id="prog_cal"></div>
+                            <div class="timer-popup" id="popup_cal">3.0s</div>
+                        </div>
+
+                        <div class="panel-row clickable tooltip-trigger" data-key="DIR1" data-item="14" id="row_dir1" style="align-items: center; position: relative;">
+                            <span class="num-tag">14</span>
+                            <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px; flex-grow:1;">
+                                <div class="led-elem" id="LED_14"></div>
+                                <div class="push-btn" id="btn_dir1" title="Hold 3s for DS1 Cal"></div>
+                            </div>
+                            <span class="element-desc" style="flex-grow:0; width: 38px;">DIR1</span>
+                            <div class="hold-progress" id="prog_dir1"></div>
+                            <div class="timer-popup" id="popup_dir1">3.0s</div>
+                        </div>
+
+                        <div class="panel-row clickable tooltip-trigger" data-key="DIR1" data-item="15" id="row_dir2" style="align-items: center; position: relative;">
+                            <span class="num-tag">15</span>
+                            <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px; flex-grow:1;">
+                                <div class="led-elem" id="LED_15"></div>
+                                <div class="push-btn" id="btn_dir2" title="Hold 3s for DS2 Cal"></div>
+                            </div>
+                            <span class="element-desc" style="flex-grow:0; width: 38px;">DIR2</span>
+                            <div class="hold-progress" id="prog_dir2"></div>
+                            <div class="timer-popup" id="popup_dir2">3.0s</div>
+                        </div>
+
+                        <div class="panel-row tooltip-trigger" data-tag="SIM" data-msg="must not be used" style="align-items: center; cursor: pointer; border-radius: 3px; transition: background 0.15s;">
+                            <span class="num-tag">16</span>
+                            <div class="sim-socket-group">
+                                <div class="sim-pair"><div class="sim-socket"></div><div class="sim-socket"></div></div>
+                                <div class="sim-pair"><div class="sim-socket"></div><div class="sim-socket"></div></div>
+                            </div>
+                            <span class="element-desc" style="flex-grow:0; width: 38px; font-size:9px;">SIM1/2</span>
+                        </div>
+
+                        <div class="panel-row fuse-row tooltip-trigger" data-tag="F1" data-msg="0,2 A medium time lag fuse for DS1" id="fuseF1Row" onclick="_0x4f82a('F1')">
+                            <span class="num-tag">17</span>
+                            <div class="fuse-slot" style="margin-left:6px;">F1</div>
+                            <span class="element-desc fuse-desc" style="font-size:8px;">0,2A (DS1)</span>
+                        </div>
+                        <div class="panel-row fuse-row tooltip-trigger" data-tag="F2" data-msg="0,2 A medium time lag fuse for DS2" id="fuseF2Row" onclick="_0x4f82a('F2')">
+                            <span class="num-tag">17</span>
+                            <div class="fuse-slot" style="margin-left:6px;">F2</div>
+                            <span class="element-desc fuse-desc" style="font-size:8px;">0,2A (DS2)</span>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+            <button class="btn-reset" onclick="_0x7b21e()">BROWSER REFRESH</button>
+
+            <div id="resetButtonsContainer" style="display: none; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px;">
+                <div style="background: #111820; border: 1px solid #00bcd4; border-radius: 4px; padding: 8px; display: flex; flex-direction: column; gap: 6px; box-shadow: 0 0 10px rgba(0, 188, 212, 0.15);">
+                    <div style="font-size: 10px; font-weight: bold; color: #00e5ff; text-align: center; border-bottom: 1px solid #283845; padding-bottom: 3px;">TVDS1 RESETS</div>
+                    <div class="panel-row clickable-btn-row full-clickable-btn-row tooltip-trigger" data-action="PRP1" id="row_prp1" style="margin: 0; position: relative; padding: 5px; background: rgba(0,188,212,0.08); border: 1px solid rgba(0,229,255,0.4); border-radius: 4px;">
+                        <div class="hold-progress" id="prog_prp1"></div>
+                        <div class="square-push-btn" id="btn_prp1" title="Hold 4s for TVDS1 Prep Reset"></div>
+                        <span class="element-desc" style="font-size: 10px; margin-left: 8px; color:#fff; font-weight:bold;">TVDS1 PREP RST</span>
+                        <div class="timer-popup" id="popup_prp1">4.0s</div>
+                    </div>
+                    <div class="panel-row clickable-btn-row full-clickable-btn-row tooltip-trigger" data-action="HRD1" id="row_hrd1" style="margin: 0; position: relative; padding: 5px; background: rgba(0,188,212,0.08); border: 1px solid rgba(0,229,255,0.4); border-radius: 4px;">
+                        <div class="hold-progress" id="prog_hrd1"></div>
+                        <div class="square-push-btn" id="btn_hrd1" title="Hold 4s for TVDS1 Hard Reset"></div>
+                        <span class="element-desc" style="font-size: 10px; margin-left: 8px; color:#fff; font-weight:bold;">TVDS1 HARD RST</span>
+                        <div class="timer-popup" id="popup_hrd1">4.0s</div>
+                    </div>
+                </div>
+
+                <div style="background: #111820; border: 1px solid #00bcd4; border-radius: 4px; padding: 8px; display: flex; flex-direction: column; gap: 6px; box-shadow: 0 0 10px rgba(0, 188, 212, 0.15);">
+                    <div style="font-size: 10px; font-weight: bold; color: #00e5ff; text-align: center; border-bottom: 1px solid #283845; padding-bottom: 3px;">TVDS2 RESETS</div>
+                    <div class="panel-row clickable-btn-row full-clickable-btn-row tooltip-trigger" data-action="PRP2" id="row_prp2" style="margin: 0; position: relative; padding: 5px; background: rgba(0,188,212,0.08); border: 1px solid rgba(0,229,255,0.4); border-radius: 4px;">
+                        <div class="hold-progress" id="prog_prp2"></div>
+                        <div class="square-push-btn" id="btn_prp2" title="Hold 4s for TVDS2 Prep Reset"></div>
+                        <span class="element-desc" style="font-size: 10px; margin-left: 8px; color:#fff; font-weight:bold;">TVDS2 PREP RST</span>
+                        <div class="timer-popup" id="popup_prp2">4.0s</div>
+                    </div>
+                    <div class="panel-row clickable-btn-row full-clickable-btn-row tooltip-trigger" data-action="HRD2" id="row_hrd2" style="margin: 0; position: relative; padding: 5px; background: rgba(0,188,212,0.08); border: 1px solid rgba(0,229,255,0.4); border-radius: 4px;">
+                        <div class="hold-progress" id="prog_hrd2"></div>
+                        <div class="square-push-btn" id="btn_hrd2" title="Hold 4s for TVDS2 Hard Reset"></div>
+                        <span class="element-desc" style="font-size: 10px; margin-left: 8px; color:#fff; font-weight:bold;">TVDS2 HARD RST</span>
+                        <div class="timer-popup" id="popup_hrd2">4.0s</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="counter-section" id="counterSectionBox">
+                <div class="counter-section-title">TVDS Axle & Wheel Counter Display</div>
+                <div class="counter-row-grid">
+                    <div class="counter-card">
+                        <div class="counter-card-header">TVDS1 Wheel Count</div>
+                        <div class="digit-display" id="cnt_tvds1_disp">00000</div>
+                        <div class="counter-subtext" id="cnt_tvds1_sub">NET COUNT: 0</div>
+                    </div>
+                    <div class="counter-card">
+                        <div class="counter-card-header">TVDS2 Wheel Count</div>
+                        <div class="digit-display" id="cnt_tvds2_disp">00000</div>
+                        <div class="counter-subtext" id="cnt_tvds2_sub">NET COUNT: 0</div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <div class="card">
+            <div class="card-header-row">
+                <h2>Manual Description & Diagnostic Output</h2>
+                
+                <div class="controls-panel">
+                    <div class="toggles-row-top">
+                        <div class="widget-box">
+                            <span class="widget-title">GPS Clock (IST)</span>
+                            <div class="widget-display" id="gpsClockDisplay">00:00:00</div>
+                        </div>
+
+                        <div class="tooltip-toggle-wrapper">
+                            <span>Tooltips</span>
+                            <label class="switch">
+                                <input type="checkbox" id="tooltipToggle">
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="toggles-row-bottom">
+                        <div class="widget-box">
+                            <span class="widget-title">Timer</span>
+                            <div class="widget-display-row">
+                                <span class="widget-display" id="trainingTimerDisplay">00:00:00</span>
+                                <div class="timer-controls">
+                                    <button class="timer-btn" onclick="_0x3f12a()" id="timerToggleBtn">START</button>
+                                    <button class="timer-btn" onclick="_0x8c34f()">RST</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="tooltip-toggle-wrapper">
+                            <span>Train Movement</span>
+                            <label class="switch">
+                                <input type="checkbox" id="trainMoveToggle" onchange="_0x112b9(this)">
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+            
+            <div class="info-box" id="infoOutput">
+                <h3>System Ready</h3>
+                <span class="badge badge-info">SELECT ITEM</span>
+                <p>Front panel ke kisi bhi LED row, fuse, Ethernet port, ya button par hover/click karke test karein.</p>
+            </div>
+
+        </div>
+
+    </div>
+
+    <footer class="app-footer">
+        <div>&copy; 2026 | Designed & Developed by Indranil Jana</div>
+        <div style="margin-top: 2px;">Sr. Engineer – Siemens GBS</div>
+    </footer>
+</div>
+
+<script>
+    // --- ANTI-THEFT / DOMAIN LOCK & FAKE CODE INJECTION ---
+    (function() {
+        // Aap apna GitHub Pages URL yahan dal sakte hain taaki sirf wahin chale, 
+        // baaki dusri website pe kholne par fake/error code show ho jayega.
+        const allowedDomain = ""; // Agar empty chhodenge toh khud ke domain pe chalega, baaki kisi iframe/domain pe fake code dikhega.
+        if (window.self !== window.top || (allowedDomain && window.location.hostname !== allowedDomain && window.location.hostname !== "localhost")) {
+            document.open();
+            document.write('<!DOCTYPE html><html><head><title>403 Forbidden</title></head><body style="background:#111;color:#ff3333;font-family:monospace;padding:50px;text-align:center;"><h1>Access Denied</h1><p>Unauthorized code inspection or embedding detected.</p></body></html>');
+            document.close();
+            throw new Error("Access Denied");
+        }
+    })();
+
+    // --- ANTI-INSPECT & SECURITY LAYER ---
+    document.addEventListener('contextmenu', function(e) { e.preventDefault(); });
+    document.addEventListener('keydown', function(e) {
+        if (e.keyCode === 123 || 
+            (e.ctrlKey && e.shiftKey && (e.keyCode === 73 || e.keyCode === 74 || e.keyCode === 67)) || 
+            (e.ctrlKey && e.keyCode === 85) || 
+            (e.ctrlKey && e.keyCode === 83)) {
+            e.preventDefault();
+            return false;
+        }
+    });
+
+    // Anti-Debugging Trap
+    setInterval(function() {
+        const _0x1a = function() {
+            try {
+                let _0x2b = function() {};
+                _0x2b.constructor("debugger")();
+            } catch (_0x3c) {}
+        };
+        _0x1a();
+    }, 1000);
+
+    // --- OUTSIDE CLICK TO HIDE TOOLTIP ---
+    $(document).on('click', function(e) {
+        if (!$(e.target).closest('.tooltip-trigger, #global-tooltip').length) {
+            if (_0x148) clearTimeout(_0x148);
+            _0x9944e();
+        }
+    });
+
+    const _0x01a = {
+        OK: { 
+            "off": "OFF: Power Failure", 
+            "steady-green": "Steady Green: ACM is OK", 
+            "flashing-green": "Flashing Green: configuration acceptance mode", 
+            "flashing-yellow": "Flashing Yellow: configuration mode", 
+            "flashing-red": "Flashing Red: ACM is not OK", 
+            "steady-red": "Steady Red: safety shutdown (Restart required)" 
+        },
+        COM: { "off": "OFF: Local DP/Standalone", "steady-green": "Steady Green: Ethernet OK", "steady-yellow": "Steady Yellow: No physical link", "steady-red": "Steady Red: Link failed", "flashing-red": "Flashing Red: COM Fault" },
+        TVDS1: { "off": "OFF: Unconfigured", "steady-green": "Steady Green: TVDS Clear", "steady-yellow": "Steady Yellow: Section Occupied", "orange": "Orange: Preparatory Reset / Link Down", "steady-red": "Steady Red: Count Error" },
+        DS1_1: { "off": "OFF: Inactive", "steady-green": "Steady Green: Normal", "steady-yellow": "Steady Yellow/Orange: Wheel Pulse" },
+        RR1: { "off": "OFF: No RR", "steady-green": "Steady Green: OK", "orange": "Orange: RR Active (In-Count / Occupied)" },
+        CAL: { "off": "OFF: Normal", "steady-green": "Steady Green: Success" },
+        DIR1: { "off": "OFF: Normal dir", "steady-green": "Steady Green: Reversed" }
+    };
+
+    let _0x02b = {};
+    let _0x03c = {};
+    let _0x04d = { F1: false, F2: false };
+    let _0x05e = { ds1Calibrated: true, ds2Calibrated: true, calModeActive: false };
+    let _0x06f = 0;
+
+    let _0x07a = 0, _0x08b = 0;
+    let _0x09c = false, _0x0ad = false;
+
+    let _0x0be = null;
+    let _0x0cf = null;
+
+    let _0x0d1 = false;
+    let _0x0e2 = false;
+
+    let _0x0f3 = null; 
+    let _0x104 = null;
+
+    let _0x115 = null;
+    let _0x126 = null;
+    let _0x137 = null;
+    let _0x148 = null;
+    let _0x159 = false;
+
+    let _0x16a = 0;
+    let _0x17b = null;
+    let _0x18c = false;
+
+    setInterval(() => {
+        const _0x19d = new Date();
+        const _0x1ae = String(_0x19d.getHours()).padStart(2, '0');
+        const _0x1bf = String(_0x19d.getMinutes()).padStart(2, '0');
+        const _0x1c0 = String(_0x19d.getSeconds()).padStart(2, '0');
+        $('#gpsClockDisplay').text(`${_0x1ae}:${_0x1bf}:${_0x1c0}`);
+    }, 1000);
+
+    function _0x3f12a() {
+        const _$btn = $('#timerToggleBtn');
+        if (!_0x18c) {
+            _0x18c = true;
+            _$btn.text('STOP').css('background', '#c62828');
+            _0x17b = setInterval(() => {
+                _0x16a++;
+                const h = String(Math.floor(_0x16a / 3600)).padStart(2, '0');
+                const m = String(Math.floor((_0x16a % 3600) / 60)).padStart(2, '0');
+                const s = String(_0x16a % 60).padStart(2, '0');
+                $('#trainingTimerDisplay').text(`${h}:${m}:${s}`);
+            }, 1000);
+            _0x99281('Timer Started', 'badge-info', '• Stopwatch timer is now running.\n• Track your troubleshooting session duration.', '• Click STOP when finished.');
+        } else {
+            _0x18c = false;
+            clearInterval(_0x17b);
+            _$btn.text('START').css('background', '#1f2937');
+            _0x99281('Timer Paused', 'badge-warning', `• Session paused at ${$('#trainingTimerDisplay').text()}.`, '• Click START to resume.');
+        }
+    }
+
+    function _0x8c34f() {
+        _0x18c = false;
+        clearInterval(_0x17b);
+        _0x16a = 0;
+        $('#trainingTimerDisplay').text('00:00:00');
+        $('#timerToggleBtn').text('START').css('background', '#1f2937');
+        _0x99281('Timer Reset', 'badge-info', '• Stopwatch timer has been reset to 00:00:00.', '• Ready for new session.');
+    }
+
+    function _0x5511a() { return $('#tooltipToggle').is(':checked'); }
+    function _0x5522b() { return $('#trainMoveToggle').is(':checked'); }
+
+    $(document).on('mouseenter', '.tooltip-trigger', function() {
+        if (!_0x5511a() || _0x159) return;
+        const _$this = $(this);
+        const _itemNum = parseInt(_$this.data('item'));
+        const _key = _$this.data('key');
+        const _customTag = _$this.data('tag');
+        const _customMsg = _$this.data('msg');
+        _0x7733c(_itemNum, _key, _customTag, _customMsg);
+    });
+
+    function _0x7733c(_itemNum, _key, _customTag, _customMsg) {
+        if (!_0x5511a()) return;
+        if (_0x148) clearTimeout(_0x148);
+
+        const _$tooltip = $('#global-tooltip');
+        _0x159 = false;
+        $('#particle-canvas').hide();
+
+        const _$tooltipLed = $('#tooltipLed');
+        const _$tooltipText = $('#tooltipText');
+
+        if (_customTag) {
+            _$tooltipText.html(`<strong>[${_customTag}]</strong> ${_customMsg}`);
+            _$tooltipLed.removeClass().addClass('tooltip-led').css('background-color', '#00bcd4');
+        } else {
+            const _currentState = _0x03c[_itemNum] || 'off';
+            let _mapKey = _key;
+            if (_key === 'TVDS2') _mapKey = 'TVDS1';
+            if (_key.startsWith('DS')) _mapKey = 'DS1_1';
+            if (_key.startsWith('RR')) _mapKey = 'RR1';
+            if (_key.startsWith('DIR')) _mapKey = 'DIR1';
+
+            const _category = _0x01a[_mapKey];
+            let _text = _category ? (_category[_currentState] || `State: ${_currentState}`) : `State: ${_currentState}`;
+
+            _$tooltipText.html(`<strong>[${_0x8844d(_itemNum)}]</strong> ${_text}`);
+            let _ledColor = '#ff3333';
+            if (_currentState.includes('green')) _ledColor = '#00ff66';
+            else if (_currentState.includes('yellow')) _ledColor = '#ffb300';
+            else if (_currentState.includes('orange')) _ledColor = '#ff7700';
+            
+            _$tooltipLed.removeClass().addClass('tooltip-led').css('background-color', _ledColor);
+        }
+        
+        _$tooltip.stop(true, true).css({opacity: 1, transform: 'scale(1)'}).show();
+
+        _0x148 = setTimeout(() => {
+            _0x9944e();
+        }, 10000);
+    }
+
+    function _0x9944e() {
+        const _$tooltip = $('#global-tooltip');
+        if (!_$tooltip.is(':visible') || _0x159) return;
+
+        _0x159 = true;
+        if (_0x148) clearTimeout(_0x148);
+
+        const _canvas = document.getElementById('particle-canvas');
+        const _ctx = _canvas.getContext('2d');
+        
+        _canvas.width = _$tooltip.outerWidth();
+        _canvas.height = _$tooltip.outerHeight();
+        $(_canvas).show();
+
+        let _particles = [];
+        let _numParticles = 220;
+        for (let i = 0; i < _numParticles; i++) {
+            _particles.push({
+                x: Math.random() * _canvas.width,
+                y: Math.random() * _canvas.height,
+                vx: (Math.random() - 0.5) * 10,
+                vy: (Math.random() - 0.7) * 8 - 3,
+                size: Math.random() * 3.5 + 1.2,
+                color: Math.random() > 0.3 ? '#00e5ff' : (Math.random() > 0.5 ? '#00ff66' : '#ffb300'),
+                alpha: Math.random() * 0.9 + 0.3
+            });
+        }
+
+        let _startTime = Date.now();
+        function _anim() {
+            let _elapsed = Date.now() - _startTime;
+            _ctx.clearRect(0, 0, _canvas.width, _canvas.height);
+
+            _particles.forEach(p => {
+                p.x += p.vx;
+                p.y += p.vy;
+                p.vy += 0.2;
+                p.alpha -= 0.018;
+
+                _ctx.save();
+                _ctx.shadowBlur = 10;
+                _ctx.shadowColor = p.color;
+                _ctx.fillStyle = p.color;
+                _ctx.globalAlpha = Math.max(0, p.alpha);
+                _ctx.fillRect(p.x, p.y, p.size, p.size);
+                _ctx.restore();
+            });
+
+            let _progress = _elapsed / 450;
+            _$tooltip.css({
+                opacity: Math.max(0, 1 - _progress),
+                transform: `scale(${Math.max(0.7, 1 - _progress * 0.3)}) translateY(-${_progress * 15}px)`
+            });
+
+            if (_elapsed < 450 && _0x159) {
+                requestAnimationFrame(_anim);
+            } else {
+                _$tooltip.hide().css({opacity: 1, transform: 'scale(1)'});
+                $(_canvas).hide();
+                _0x159 = false;
+            }
+        }
+        requestAnimationFrame(_anim);
+    }
+
+    $('#tooltipToggle').on('change', function() { 
+        if (!this.checked) {
+            if (_0x148) clearTimeout(_0x148);
+            _0x9944e();
+        } 
+    });
+
+    function _0x112b9(_checkbox) {
+        if (_checkbox.checked) {
+            $('#counterSectionBox').slideDown(200);
+            $('#resetButtonsContainer').css('display', 'grid').hide().fadeIn(250);
+            
+            _0x07a = 0; _0x08b = 0; _0x09c = false; _0x0ad = false;
+            _0x0be = null; _0x0cf = null;
+            _0x0d1 = false; _0x0e2 = false;
+            _0x0f3 = null; _0x104 = null;
+            
+            if (_0x04d.F1 || !_0x05e.ds1Calibrated) {
+                _0x9911a(4, 'steady-yellow');
+                _0x9911a(5, 'steady-yellow');
+                _0x9911a(2, 'steady-yellow');
+            } else {
+                _0x9911a(4, 'steady-green');
+                _0x9911a(5, 'steady-green');
+                _0x9911a(2, 'steady-green');
+            }
+
+            if (_0x04d.F2 || !_0x05e.ds2Calibrated) {
+                _0x9911a(6, 'steady-yellow');
+                _0x9911a(7, 'steady-yellow');
+                _0x9911a(3, 'steady-yellow');
+            } else {
+                _0x9911a(6, 'steady-green');
+                _0x9911a(7, 'steady-green');
+                _0x9911a(3, 'steady-green');
+            }
+
+            _0x9911a(8, 'off');
+            _0x9911a(9, 'off');
+
+            _0x33221();
+            _0x99281('Dynamic Sequence Mode Active', 'badge-info', '• Channel 1 & Channel 2 sequence tracking ready.\n• TVDS1/TVDS2 Prep & Hard Reset buttons enabled.', '• Click DS1.1/DS1.2 or use Reset buttons below.');
+        } else {
+            $('#counterSectionBox').slideUp(200);
+            $('#resetButtonsContainer').fadeOut(200);
+            
+            _0x9911a(1, 'steady-green');
+            for (let i = 2; i <= 15; i++) {
+                if (i !== 10) _0x9911a(i, 'off');
+            }
+            _0x07a = 0; _0x08b = 0; _0x09c = false; _0x0ad = false;
+            _0x0be = null; _0x0cf = null;
+            _0x0d1 = false; _0x0e2 = false;
+            _0x0f3 = null; _0x104 = null;
+            
+            _0x9911a(2, 'off');
+            _0x9911a(3, 'off');
+            $('#row_tvds1, #row_tvds2').removeClass('clickable').addClass('non-clickable');
+
+            _0x99281('System Idle (Switch OFF)', 'badge-info', '• Train Movement Toggle is OFF.\n• TVDS is unconfigured initially.\n• Click COM link or DS channels to make TVDS clickable.', '• Click COM / DS channels to begin.');
+        }
+    }
+
+    function _0x44332() {
+        if (_0x5522b()) return;
+
+        const _ds1_4 = _0x03c[4] || 'off'; 
+        const _ds1_5 = _0x03c[5] || 'off'; 
+        const _ds2_6 = _0x03c[6] || 'off'; 
+        const _ds2_7 = _0x03c[7] || 'off'; 
+        const _comState = _0x03c[10] || 'off'; 
+
+        const _isDs1Active = (_ds1_4 !== 'off') || (_ds1_5 !== 'off');
+        const _isDs2Active = (_ds2_6 !== 'off') || (_ds2_7 !== 'off');
+        const _isComOk = (_comState === 'steady-green');
+
+        const _$row1 = $('#row_tvds1');
+        const _$row2 = $('#row_tvds2');
+
+        if (!_isDs1Active && !_isDs2Active && (_comState === 'steady-yellow' || _comState === 'orange' || _comState === 'steady-red')) {
+            _0x9911a(2, 'orange');
+            _0x9911a(3, 'orange');
+            _$row1.addClass('clickable').removeClass('non-clickable');
+            _$row2.addClass('clickable').removeClass('non-clickable');
+            _0x99281('COM Link Down Warning', 'badge-warning', '• DS1 & DS2 are OFF.\n• COM Link is down/fault.\n• Both TVDS1 & TVDS2 forced to ORANGE.', '• Check COM connection.');
+            return;
+        }
+
+        let _ds2State = 'off';
+        if (_ds2_6 === 'orange' || _ds2_7 === 'orange') _ds2State = 'orange';
+        else if (_ds2_6 === 'steady-red' || _ds2_7 === 'steady-red') _ds2State = 'steady-red';
+        else if (_ds2_6 === 'steady-yellow' || _ds2_7 === 'steady-yellow') _ds2State = 'steady-yellow';
+
+        if (_ds2State !== 'off') {
+            _0x9911a(2, _ds2State);
+            _0x9911a(3, _ds2State);
+            _$row1.addClass('clickable').removeClass('non-clickable');
+            _$row2.addClass('clickable').removeClass('non-clickable');
+            _0x99281(`DS2 State Following (${_ds2State.toUpperCase()})`, 'badge-warning', `• DS2 channel is ${_ds2State}.\n• TVDS1 & TVDS2 automatically following ${_ds2State}.`, '• Click DS2 channels again to change state.');
+            return;
+        }
+
+        let _ds1State = 'off';
+        if (_ds1_4 === 'orange' || _ds1_5 === 'orange') _ds1State = 'orange';
+        else if (_ds1_4 === 'steady-red' || _ds1_5 === 'steady-red') _ds1State = 'steady-red';
+        else if (_ds1_4 === 'steady-yellow' || _ds1_5 === 'steady-yellow') _ds1State = 'steady-yellow';
+
+        if (_ds1State !== 'off') {
+            _0x9911a(2, _ds1State);
+            _$row1.addClass('clickable').removeClass('non-clickable');
+            _0x99281(`DS1 State Following (${_ds1State.toUpperCase()})`, 'badge-warning', `• DS1 channel is ${_ds1State}.\n• TVDS1 automatically following ${_ds1State}.`, '• Click DS1 channels again to change state.');
+            if (!_isDs2Active && !_isComOk) {
+                _0x9911a(3, 'off');
+                _$row2.removeClass('clickable').addClass('non-clickable');
+            }
+            return;
+        }
+
+        if (_isComOk || _isDs1Active) {
+            _$row1.addClass('clickable').removeClass('non-clickable');
+        } else {
+            _$row1.removeClass('clickable').addClass('non-clickable');
+            _0x9911a(2, 'off');
+        }
+
+        if (_isComOk || (_isDs1Active && _isDs2Active)) {
+            _$row2.addClass('clickable').removeClass('non-clickable');
+        } else {
+            _$row2.removeClass('clickable').addClass('non-clickable');
+            _0x9911a(3, 'off');
+        }
+    }
+
+    function _0x33221() {
+        const _fmt = (val) => val >= 0 ? String(val).padStart(5, '0') : '-' + String(Math.abs(val)).padStart(4, '0');
+
+        _0x9911a(1, 'steady-green');
+
+        if (!_0x5522b()) {
+            _0x44332();
+            return;
+        }
+
+        const _$c1 = $('#cnt_tvds1_disp');
+        $('#cnt_tvds1_sub').text(`NET COUNT: ${_0x07a}`);
+        _$c1.text(_fmt(_0x07a)).removeClass('occupied error orange');
+
+        if (_0x07a !== 0 && _0x0d1) {
+            _0x0d1 = false;
+        }
+
+        if (_0x07a < 0) {
+            _0x09c = true;
+        } else if (_0x07a === 0 && !_0x0d1) {
+            _0x09c = false;
+        }
+
+        if (_0x09c || _0x07a < 0) {
+            _$c1.addClass('error');
+            _0x9911a(2, 'steady-red');
+        } else if (_0x0d1 && _0x07a === 0) {
+            _$c1.addClass('orange');
+            _0x9911a(2, 'orange');
+        } else if (_0x07a > 0) {
+            _$c1.addClass('occupied');
+            _0x9911a(2, 'steady-yellow');
+        } else {
+            _0x9911a(2, 'steady-green');
+        }
+
+        if (_0x0be === 'incount' && _0x07a > 0) {
+            _0x9911a(8, 'orange');
+        } else if (_0x0be === 'outcount' || _0x07a === 0) {
+            _0x9911a(8, 'off');
+        }
+
+        const _$c2 = $('#cnt_tvds2_disp');
+        $('#cnt_tvds2_sub').text(`NET COUNT: ${_0x08b}`);
+        _$c2.text(_fmt(_0x08b)).removeClass('occupied error orange');
+
+        if (_0x08b !== 0 && _0x0e2) {
+            _0x0e2 = false;
+        }
+
+        if (_0x08b < 0) {
+            _0x0ad = true;
+        } else if (_0x08b === 0 && !_0x0e2) {
+            _0x0ad = false;
+        }
+
+        if (_0x0ad || _0x08b < 0) {
+            _$c2.addClass('error');
+            _0x9911a(3, 'steady-red');
+        } else if (_0x0e2 && _0x08b === 0) {
+            _$c2.addClass('orange');
+            _0x9911a(3, 'orange');
+        } else if (_0x08b > 0) {
+            _$c2.addClass('occupied');
+            _0x9911a(3, 'steady-yellow');
+        } else {
+            _0x9911a(3, 'steady-green');
+        }
+
+        if (_0x0cf === 'incount' && _0x08b > 0) {
+            _0x9911a(9, 'orange');
+        } else if (_0x0cf === 'outcount' || _0x08b === 0) {
+            _0x9911a(9, 'off');
+        }
+    }
+
+    $(document).on('click', '.panel-row.clickable', function(e) {
+        const _row = this;
+        const _key = $(_row).data('key');
+        const _itemNum = parseInt($(_row).data('item'));
+        if (!_key || (_itemNum >= 13 && _itemNum <= 15)) return;
+
+        if (_itemNum === 10) {
+            _0x99281('COM LED Info', 'badge-info', '• COM LED operates automatically with Ethernet Port (Item 19).', '• Click Ethernet Port to change state.');
+            return;
+        }
+
+        if (_0x5522b()) {
+            if ((_itemNum === 4 || _itemNum === 5) && (_0x04d.F1 || !_0x05e.ds1Calibrated)) {
+                _0x99281('DS1 Inactive / Uncalibrated!', 'badge-fault', '• F1 fuse was cut or DS1 is uncalibrated.', '• Replace F1 & Calibrate DS1.');
+                return;
+            }
+            if ((_itemNum === 6 || _itemNum === 7) && (_0x04d.F2 || !_0x05e.ds2Calibrated)) {
+                _0x99281('DS2 Inactive / Uncalibrated!', 'badge-fault', '• F2 fuse was cut or DS2 is uncalibrated.', '• Replace F2 & Calibrate DS2.');
+                return;
+            }
+
+            if (_itemNum === 4 || _itemNum === 5) {
+                _0x9911a(_itemNum, 'steady-yellow');
+
+                if (!_0x0f3) {
+                    _0x0f3 = _itemNum;
+                    _0x99281('DS1 Pulse Triggered', 'badge-info', `• First Channel Activated: DS1.${_itemNum === 4 ? '1 (Ch1)' : '2 (Ch2)'}`, '• Now click the second channel...');
+                } else {
+                    if (_0x0f3 === 4 && _itemNum === 5) {
+                        _0x07a += 1;
+                        _0x0be = 'incount';
+                        _0x99281('DS1 Incount Executed', 'badge-info', '• Sequence: DS1.1 -> DS1.2 (Ch1 -> Ch2)\n• Action: TVDS1 Incount +1 (RR1 Orange Active)', `• TVDS1 Net Count: ${_0x07a}`);
+                    } else if (_0x0f3 === 5 && _itemNum === 4) {
+                        _0x07a -= 1;
+                        _0x0be = 'outcount';
+                        _0x99281('DS1 Outcount Executed', 'badge-warning', '• Sequence: DS1.2 -> DS1.1 (Ch2 -> Ch1)\n• Action: TVDS1 Outcount -1 (RR1 OFF)', `• TVDS1 Net Count: ${_0x07a}`);
+                    }
+
+                    setTimeout(() => {
+                        if (!_0x04d.F1 && _0x05e.ds1Calibrated) {
+                            _0x9911a(4, 'steady-green');
+                            _0x9911a(5, 'steady-green');
+                        }
+                    }, 200);
+
+                    _0x0f3 = null;
+                    _0x33221();
+                }
+                return;
+            }
+
+            if (_itemNum === 6 || _itemNum === 7) {
+                _0x9911a(_itemNum, 'steady-yellow');
+
+                if (!_0x104) {
+                    _0x104 = _itemNum;
+                    _0x99281('DS2 Pulse Triggered', 'badge-info', `• First Channel Activated: DS2.${_itemNum === 6 ? '1 (Ch1)' : '2 (Ch2)'}`, '• Now click the second channel...');
+                } else {
+                    if (_0x104 === 6 && _itemNum === 7) {
+                        _0x07a -= 1;
+                        _0x08b += 1;
+                        _0x0be = 'outcount';
+                        _0x0cf = 'incount';
+                        _0x99281('DS2 Forward Passage Executed', 'badge-info', '• Sequence: DS2.1 -> DS2.2 (Ch1 -> Ch2)\n• Action: TVDS1 Out & TVDS2 In (RR2 Orange Active)', `• TVDS1: ${_0x07a} | TVDS2: ${_0x08b}`);
+                    } else if (_0x104 === 7 && _itemNum === 6) {
+                        _0x08b -= 1;
+                        _0x07a += 1;
+                        _0x0cf = 'outcount';
+                        _0x0be = 'incount';
+                        _0x99281('DS2 Reverse Passage Executed', 'badge-warning', '• Sequence: DS2.2 -> DS2.1 (Ch2 -> Ch1)\n• Action: TVDS2 Out & TVDS1 In', `• TVDS1: ${_0x07a} | TVDS2: ${_0x08b}`);
+                    }
+
+                    setTimeout(() => {
+                        if (!_0x04d.F2 && _0x05e.ds2Calibrated) {
+                            _0x9911a(6, 'steady-green');
+                            _0x9911a(7, 'steady-green');
+                        }
+                    }, 200);
+
+                    _0x104 = null;
+                    _0x33221();
+                }
+                return;
+            }
+        }
+
+        let _statesArray = ['off', 'steady-green', 'steady-yellow', 'orange', 'steady-red'];
+        if (typeof _0x02b[_itemNum] === 'undefined') _0x02b[_itemNum] = 0;
+        _0x02b[_itemNum] = (_0x02b[_itemNum] + 1) % _statesArray.length;
+        _0x9911a(_itemNum, _statesArray[_0x02b[_itemNum]]);
+        
+        _0x44332();
+        _0x7733c(_itemNum, _key, null, null);
+    });
+
+    function _0x9955a(_selector, _durationSec, _actionName, _successMsg) {
+        const _$el = $(_selector);
+        const _actionKey = _$el.data('action') || _$el.attr('id');
+        const _$prog = _$el.find('.hold-progress');
+        const _$popup = _$el.find('.timer-popup');
+        const _$squareIcon = _$el.find('.square-push-btn, .push-btn');
+        let _progInterval = null;
+
+        function _start(e) {
+            e.preventDefault();
+            _$el.addClass('active-press');
+            _$squareIcon.addClass('active-press');
+            let _startTime = Date.now();
+            _$popup.text(_durationSec.toFixed(1) + 's').show();
+
+            _progInterval = setInterval(function() {
+                let _elapsed = (Date.now() - _startTime) / 1000;
+                let _pct = Math.min(100, (_elapsed / _durationSec) * 100);
+                let _rem = Math.max(0, _durationSec - _elapsed);
+                _$prog.css('width', _pct + '%');
+                _$popup.text(_rem.toFixed(1) + 's');
+
+                if (_elapsed >= _durationSec) {
+                    clearInterval(_progInterval);
+                    _end();
+                    _0x8866b(_actionKey, _successMsg);
+                }
+            }, 50);
+        }
+
+        function _end() {
+            clearInterval(_progInterval);
+            _$el.removeClass('active-press');
+            _$squareIcon.removeClass('active-press');
+            _$prog.css('width', '0%');
+            _$popup.hide();
+        }
+
+        _$el.on('mousedown touchstart', _start);
+        $(document).on('mouseup touchend', _end);
+    }
+
+    function _0x8866b(_actionKey, _msg) {
+        if (_actionKey === 'RST' || _actionKey === 'btn_rst') {
+            _0x7b21e();
+            _0x99281('ACM Restarted', 'badge-info', '• Hardware reset executed via RST button.', '• Reboot completed.');
+        } 
+        else if (_actionKey === 'RST_RR1') {
+            _0x0be = 'outcount';
+            _0x9911a(8, 'off'); 
+            _0x99281('RR1 Manual Reset Executed', 'badge-info', '• RR1 LED manually cleared / turned OFF.', `• TVDS1 Reset restriction lifted.`);
+        } 
+        else if (_actionKey === 'RST_RR2') {
+            _0x0cf = 'outcount';
+            _0x9911a(9, 'off'); 
+            _0x99281('RR2 Manual Reset Executed', 'badge-info', '• RR2 LED manually cleared / turned OFF.', `• TVDS2 Reset restriction lifted.`);
+        }
+        else if (_actionKey === 'PRP1') {
+            if (_0x03c[8] === 'orange' || _0x0be === 'incount') {
+                _0x99281('TVDS1 Prep Reset REJECTED!', 'badge-fault', '• RR1 LED is ORANGE (Reset Restriction Active).\n• Reset cannot be accepted.', '• Press and hold "RST-RR1" button first to clear RR1 indication, then try resetting.');
+                return;
+            }
+            _0x07a = 0;
+            _0x09c = false;
+            _0x0d1 = true;
+            _0x0be = 'outcount';
+            _0x9911a(8, 'off');
+            _0x33221();
+            _0x99281('TVDS1 Preparatory Reset Executed', 'badge-warning', '• Track state changed to ORANGE.\n• Axle Count reset to 0.', '• Run a train movement across section to clear.');
+        }
+        else if (_actionKey === 'HRD1') {
+            if (_0x03c[8] === 'orange' || _0x0be === 'incount') {
+                _0x99281('TVDS1 Hard Reset REJECTED!', 'badge-fault', '• RR1 LED is ORANGE (Reset Restriction Active).\n• Reset cannot be accepted.', '• Press and hold "RST-RR1" button first to clear RR1 indication, then try resetting.');
+                return;
+            }
+            _0x07a = 0;
+            _0x09c = false;
+            _0x0d1 = false;
+            _0x0be = 'outcount';
+            _0x9911a(8, 'off');
+            _0x9911a(2, 'steady-green');
+            _0x33221();
+            _0x99281('TVDS1 Hard Reset Executed', 'badge-info', '• Track directly cleared to GREEN.\n• Axle Count reset to 0.', '• Section is normal.');
+        }
+        else if (_actionKey === 'PRP2') {
+            if (_0x03c[9] === 'orange' || _0x0cf === 'incount') {
+                _0x99281('TVDS2 Prep Reset REJECTED!', 'badge-fault', '• RR2 LED is ORANGE (Reset Restriction Active).\n• Reset cannot be accepted.', '• Press and hold "RST-RR2" button first to clear RR2 indication, then try resetting.');
+                return;
+            }
+            _0x08b = 0;
+            _0x0ad = false;
+            _0x0e2 = true;
+            _0x0cf = 'outcount';
+            _0x9911a(9, 'off');
+            _0x33221();
+            _0x99281('TVDS2 Preparatory Reset Executed', 'badge-warning', '• Track state changed to ORANGE.\n• Axle Count reset to 0.', '• Run a train movement across section to clear.');
+        }
+        else if (_actionKey === 'HRD2') {
+            if (_0x03c[9] === 'orange' || _0x0cf === 'incount') {
+                _0x99281('TVDS2 Hard Reset REJECTED!', 'badge-fault', '• RR2 LED is ORANGE (Reset Restriction Active).\n• Reset cannot be accepted.', '• Press and hold "RST-RR2" button first to clear RR2 indication, then try resetting.');
+                return;
+            }
+            _0x08b = 0;
+            _0x0ad = false;
+            _0x0e2 = false;
+            _0x0cf = 'outcount';
+            _0x9911a(9, 'off');
+            _0x9911a(3, 'steady-green');
+            _0x33221();
+            _0x99281('TVDS2 Hard Reset Executed', 'badge-info', '• Track directly cleared to GREEN.\n• Axle Count reset to 0.', '• Section is normal.');
+        }
+        else if (_actionKey === 'row_cal' || _actionKey === 'btn_cal') {
+            if (_0x115) clearTimeout(_0x115);
+            _0x9911a(13, 'yellow');
+            setTimeout(() => {
+                _0x9911a(13, 'green');
+                $('#LED_13').addClass('flash');
+                _0x05e.calModeActive = true;
+                _0x99281('ACM in Calibration Mode', 'badge-info', '• CAL LED is flashing green.\n• Now press and hold "DIR1" (3s) for DS1 or "DIR2" (3s) for DS2 calibration.', '• Press DIR1 or DIR2.');
+            }, 1000);
+
+            _0x115 = setTimeout(() => {
+                _0x9911a(13, 'off');
+                $('#LED_13').removeClass('flash');
+                _0x05e.calModeActive = false;
+            }, 15000);
+        } else if (_actionKey === 'row_dir1' || _actionKey === 'btn_dir1') {
+            if (_0x04d.F1) {
+                _0x99281('Calibration Blocked', 'badge-fault', '• F1 fuse is cut/missing.', '• Fix F1.');
+                return;
+            }
+            if (!_0x05e.calModeActive) {
+                _0x99281('Calibration Error', 'badge-warning', '• Please press and hold CAL button first (3s).', '• Enter calibration mode.');
+                return;
+            }
+            if (_0x126) clearTimeout(_0x126);
+            _0x9911a(14, 'yellow');
+            setTimeout(() => {
+                _0x9911a(14, 'green');
+                $('#LED_14').removeClass('flash');
+                _0x05e.ds1Calibrated = true;
+                _0x05e.calModeActive = false;
+                if (_0x115) clearTimeout(_0x115);
+                _0x9911a(13, 'off');
+                $('#LED_13').removeClass('flash');
+                
+                _0x9911a(4, 'steady-green');
+                _0x9911a(5, 'steady-green');
+                if (!_0x09c && _0x07a === 0 && !_0x0d1) _0x9911a(2, 'steady-green');
+
+                _0x99281('DS1 Calibration Successful', 'badge-info', '• DS1 restored to Green state.', '• Ready.');
+            }, 1000);
+
+            _0x126 = setTimeout(() => { _0x9911a(14, 'off'); }, 7000);
+        } else if (_actionKey === 'row_dir2' || _actionKey === 'btn_dir2') {
+            if (_0x04d.F2) {
+                _0x99281('Calibration Blocked', 'badge-fault', '• F2 fuse is cut/missing.', '• Fix F2.');
+                return;
+            }
+            if (!_0x05e.calModeActive) {
+                _0x99281('Calibration Error', 'badge-warning', '• Please press and hold CAL button first (3s).', '• Enter calibration mode.');
+                return;
+            }
+            if (_0x137) clearTimeout(_0x137);
+            _0x9911a(15, 'yellow');
+            setTimeout(() => {
+                _0x9911a(15, 'green');
+                $('#LED_15').removeClass('flash');
+                _0x05e.ds2Calibrated = true;
+                _0x05e.calModeActive = false;
+                if (_0x115) clearTimeout(_0x115);
+                _0x9911a(13, 'off');
+                $('#LED_13').removeClass('flash');
+                
+                _0x9911a(6, 'steady-green');
+                _0x9911a(7, 'steady-green');
+                if (!_0x0ad && _0x08b === 0 && !_0x0e2) _0x9911a(3, 'steady-green');
+
+                _0x99281('DS2 Calibration Successful', 'badge-info', '• DS2 restored to Green state.', '• Ready.');
+            }, 1000);
+
+            _0x137 = setTimeout(() => { _0x9911a(15, 'off'); }, 7000);
+        }
+    }
+
+    $(document).ready(function() {
+        _0x9955a('#row_rst', 2.0, 'RST', 'ACM Restart');
+        _0x9955a('#row_rstrr1', 4.0, 'RST_RR1', 'Reset RR1');
+        _0x9955a('#row_rstrr2', 4.0, 'RST_RR2', 'Reset RR2');
+        
+        _0x9955a('#row_prp1', 4.0, 'PRP1', 'TVDS1 Prep Reset');
+        _0x9955a('#row_hrd1', 4.0, 'HRD1', 'TVDS1 Hard Reset');
+        _0x9955a('#row_prp2', 4.0, 'PRP2', 'TVDS2 Prep Reset');
+        _0x9955a('#row_hrd2', 4.0, 'HRD2', 'TVDS2 Hard Reset');
+        
+        _0x9955a('#row_cal', 3.0, 'CAL', 'Calibration');
+        _0x9955a('#row_dir1', 3.0, 'DIR1', 'DS1 Cal');
+        _0x9955a('#row_dir2', 3.0, 'DIR2', 'DS2 Cal');
+    });
+
+    function _0x92a1b() {
+        _0x06f = (_0x06f + 1) % 3;
+        const _$box = $('#rj45Box');
+        const _$label = $('#rj45Label');
+        if (_0x06f === 0) {
+            _$box.removeClass('green-state black-state');
+            _$label.removeClass('green-text red-text').text('ETH PORT');
+            _0x9911a(10, 'off');
+            _0x99281('Ethernet Disconnected', 'badge-warning', '• COM link / Ethernet link removed.', '• Click Ethernet Port to link.');
+        } else if (_0x06f === 1) {
+            _$box.removeClass('black-state').addClass('green-state');
+            _$label.removeClass('red-text').addClass('green-text').text('ETH LINKED');
+            _0x9911a(10, 'steady-green');
+            _0x99281('Ethernet Linked OK', 'badge-info', '• COM link established successfully.', '• Ready.');
+        } else {
+            _$box.removeClass('green-state').addClass('black-state');
+            _$label.removeClass('green-text').addClass('red-text').text('CABLE REMOVED');
+            _0x9911a(10, 'steady-yellow');
+            _0x99281('Ethernet Cable Fault', 'badge-fault', '• Physical cable link failed.', '• Check cable connection.');
+        }
+        _0x44332();
+        _0x33221();
+    }
+
+    function _0x4f82a(_fuseName) {
+        _0x04d[_fuseName] = !_0x04d[_fuseName];
+        const _isBlown = _0x04d[_fuseName];
+        document.getElementById(`fuse${_fuseName}Row`).classList.toggle('blown', _isBlown);
+
+        if (_fuseName === 'F1') {
+            if (_isBlown) {
+                _0x05e.ds1Calibrated = false;
+                _0x9911a(4, 'steady-yellow');
+                _0x9911a(5, 'steady-yellow');
+                _0x99281('Fuse F1 Blown (0.2A DS1)', 'badge-fault', '• F1 cut ho gaya hai.', '• Replace F1 & calibrate.');
+            } else {
+                _0x99281('Fuse F1 Restored', 'badge-warning', '• F1 restored. Calibration pending.', '• Calibrate via CAL & DIR1.');
+            }
+        } else if (_fuseName === 'F2') {
+            if (_isBlown) {
+                _0x05e.ds2Calibrated = false;
+                _0x9911a(6, 'steady-yellow');
+                _0x9911a(7, 'steady-yellow');
+                _0x99281('Fuse F2 Blown (0.2A DS2)', 'badge-fault', '• F2 cut ho gaya hai.', '• Replace F2 & calibrate.');
+            } else {
+                _0x99281('Fuse F2 Restored', 'badge-warning', '• F2 restored. Calibration pending.', '• Calibrate via CAL & DIR2.');
+            }
+        }
+        _0x44332();
+    }
+
+    function _0x99281(_title, _badgeClass, _causes, _remedy) {
+        $('#infoOutput').html(`
+            <h3>${_title}</h3>
+            <span class="badge ${_badgeClass}">DIAGNOSTIC STATUS</span>
+            <div style="margin-top: 6px;"><strong>Details:</strong><br>${_causes.replace(/\n/g, '<br>')}</div>
+            <div style="margin-top: 8px;"><strong>Action:</strong><br>${_remedy.replace(/\n/g, '<br>')}</div>
+        `);
+    }
+
+    function _0x9911a(_itemNum, _stateKey) {
+        _0x03c[_itemNum] = _stateKey;
+        const _el = document.getElementById(`LED_${_itemNum}`);
+        if (!_el) return;
+        
+        _el.className = 'led-elem';
+        _el.style.backgroundColor = '';
+
+        if (_stateKey === 'off' || !_stateKey) {
+            _el.style.backgroundColor = '#dcdcdc';
+            return;
+        }
+
+        if (_stateKey.includes('green')) _el.classList.add('green');
+        else if (_stateKey.includes('yellow')) _el.classList.add('yellow');
+        else if (_stateKey.includes('orange')) _el.classList.add('orange');
+        else if (_stateKey.includes('red')) _el.classList.add('red');
+
+        if (_stateKey.includes('flash') || _stateKey.includes('flashing')) {
+            _el.classList.add('flash');
+        } else {
+            _el.classList.add('solid');
+        }
+    }
+
+    function _0x8844d(_itemNum) {
+        const _names = {1:'OK', 2:'TVDS1', 3:'TVDS2', 4:'DS1.1', 5:'DS1.2', 6:'DS2.1', 7:'DS2.2', 8:'RR1', 9:'RR2', 10:'COM', 13:'CAL', 14:'DIR1', 15:'DIR2'};
+        return _names[_itemNum] || _itemNum;
+    }
+
+    function _0x7b21e() {
+        const _$bodyEl = document.body;
+        _$bodyEl.classList.add('reloading');
+        setTimeout(() => {
+            if (_0x115) clearTimeout(_0x115);
+            if (_0x126) clearTimeout(_0x126);
+            if (_0x137) clearTimeout(_0x137);
+            if (_0x148) clearTimeout(_0x148);
+
+            _0x04d.F1 = false; _0x04d.F2 = false;
+            _0x05e = { ds1Calibrated: true, ds2Calibrated: true, calModeActive: false };
+            _0x06f = 0;
+            _0x07a = 0; _0x08b = 0; _0x09c = false; _0x0ad = false;
+            _0x0be = null; _0x0cf = null;
+            _0x0d1 = false; _0x0e2 = false;
+            _0x0f3 = null; _0x104 = null;
+            _0x159 = false;
+            
+            for (let k in _0x02b) {
+                delete _0x02b[k];
+            }
+            
+            _0x9911a(2, 'off');
+            _0x9911a(3, 'off');
+            $('#row_tvds1, #row_tvds2').removeClass('clickable').addClass('non-clickable');
+            
+            $('#trainMoveToggle').prop('checked', false);
+            $('#counterSectionBox').hide();
+            $('#resetButtonsContainer').hide();
+            $('#tooltipToggle').prop('checked', false); // Default OFF on reload/load
+
+            $('#rj45Box').removeClass('green-state black-state');
+            $('#rj45Label').removeClass('green-text red-text').text('ETH PORT');
+            document.getElementById('fuseF1Row').classList.remove('blown');
+            document.getElementById('fuseF2Row').classList.remove('blown');
+
+            for (let i = 1; i <= 15; i++) {
+                if (i === 1) {
+                    _0x9911a(i, 'steady-green');
+                } else {
+                    _0x9911a(i, 'off');
+                }
+            }
+            _33221_safe_call = () => { _0x33221(); };
+            _33221_safe_call();
+            $('#global-tooltip').hide();
+            _0x99281('System Ready (Fresh Load)', 'badge-info', '• OK LED is ON.\n• GPS Clock & Timer active.', '• Hover over any row to test.');
+            _$bodyEl.classList.remove('reloading');
+        }, 300);
+    }
+
+    window.onload = function() { _0x7b21e(); };
+</script>
+
+</body>
+</html>
